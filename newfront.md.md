@@ -1,0 +1,94 @@
+---
+
+
+---
+
+<h1 id="brak-mi-pomysłu-na-tytuł">BRAK MI POMYSŁU NA TYTUŁ</h1>
+<p>In June 2017 we’ve launched our main product, kredytomat - <a href="https://kredytomat.finai.pl">https://kredytomat.finai.pl</a> . We’ve come a long way since the realse, added new features, fixed a lot of bus, learned even more and never stopped to improve, we are still far from the perfection but we strive for it. Which is not to say that we are not happy with our achievements, there is a multitude of solutions and designs that we are very proud of. However, there are also some parts of our service that require an attention. Hectic pace of development and more often than not lacking analisys, made for web app that doesn’t meet our needs.</p>
+<p>Our process is very simple, there are two types of activities:</p>
+<ul>
+<li>Gather the data through various <em>non-linear</em> steps and then save it (family, income, job, how much would you like to loan etc.)</li>
+<li>Wait for background process to end (biometry, wait for offers etc.)</li>
+</ul>
+<p>I highly recommend trying it - <a href="https://kredytomat.finai.pl">https://kredytomat.finai.pl</a> :) It costs nothing and you will get a insight of how banks see you. Also, below picture will make more sense.<br>
+<img src="https://lh3.googleusercontent.com/L9-35PHHUFa-V_eYPKFYH2ywrGsNnbx0b0Ts0xCtAzVu2y6m4pAObJ3scDeOE0LTeTWP7INgIya60g" alt="Flow" title="Flow"></p>
+<p>Flow depends on the answers, one can also move backward and forward in chapters (sometimes refered to as parts) but cannot go back to previous chapter. That’s it, really.</p>
+<p>Current issues &amp; pain points:</p>
+<ul>
+<li>views that know too much</li>
+</ul>
+<p>That was our biggest issue, conditional flow was based on a wrong assumption that it will not require any data other than views own. It wasn’t until we needed to change the order that we saw a big flaw of letting the views decide where they follow. Unexpectedly one view has to have a data from completely unrelated view which later made for unsightly hacks and leaks.</p>
+<ul>
+<li>frontend store</li>
+</ul>
+<p>Second pain came from a very unexpected place. Having front to store some <em>unimportant</em> data in a form that is convient for it is a great idea, isn’t it? Turns out, it’s not. It’s awfuly tempting to abuse it - store the data that affects the user flow and, to make matters worse, is a duplicate of what is stored in the backend. It was a quick shortcut that we took and paid for it dearly. This one is for the future (near), we didn’t quite decided how we want to solve this.</p>
+<ul>
+<li>coupling &amp; reusability</li>
+</ul>
+<p>Beacuse our views know too much, our services were close together, consequently abstraction leaked. Also, angular (our frontend framework) makes it all too easy to put everyting in two or three modules. Now we have a need to share the components with other products and it costs us a lot to get anything out of our code base and share.</p>
+<ul>
+<li>configuration</li>
+</ul>
+<p>Soon after we’ve launched, tests with a real consumer proved some of our assumptions wrong. But that’s fine, “to live is to learn”, however, swaping views started to cost too much and made few parts of the code incresingly difficult to understand. Moreover, there were assumptions that parts of the solution won’t change in a foreseeable future. A month in and it turned out that we need to ab test + configure exactly those.</p>
+<p>First thing we need to tackle is modularization and reusability. Nx is a great tool that makes building libraries a breeze - <a href="https://nrwl.io/nx">https://nrwl.io/nx</a> also it has a great visualisation tool to show all the connections and review the architecture (and potential leaks or god modules) at a glance.</p>
+<p>Second thing that we need to take care of is a state management. Take a look at the first picture again, what does it look like? Some “points” that have defined “transitions”, smaller parts that in the end shouldn’t interact with each other. Yes, it’s just a few state machines. And that works for 3 out of 4 issues above:</p>
+<ul>
+<li>
+<p>views will not have too much responsibility. The only thing required from them is to get data from the customer and/or convey the message then return the result to the state machine.</p>
+</li>
+<li>
+<p>views will be decoupled of the business logic because state machine will issue the commands with side effects</p>
+</li>
+<li>
+<p>centralized state management makes configuration clear and simple</p>
+</li>
+</ul>
+<p>After 3 proof of concepts we seatled to choose between two frameworks to help us with state management:</p>
+<ul>
+<li>xstate - <a href="https://github.com/davidkpiano/xstate">https://github.com/davidkpiano/xstate</a></li>
+</ul>
+<p>Great state machine framework, very nice api, flexibility and great features. I would love to have such on the backend. Hierarchical state machines with actor model, that author of the framework recommends, work beautifuly. I really wanted this to be our choice, it would probably make us rethink the way we build fronts and would require us to redesign some of the flows, but that’s a good thing. It would be for the better. However, one thing made using xstate a pain, stringly typed actions without parameters. Actions are configured in a separate object and run by the name. On the below snipet you can see actions in the onEntry, onExit and on event INC.</p>
+<pre class=" language-javascript"><code class="prism  language-javascript"><span class="token keyword">const</span>  counterMachine <span class="token operator">=</span> <span class="token function">Machine</span><span class="token punctuation">(</span><span class="token punctuation">{</span>
+	id<span class="token punctuation">:</span>  <span class="token string">"counter"</span><span class="token punctuation">,</span>
+	initial<span class="token punctuation">:</span>  <span class="token string">"counting"</span><span class="token punctuation">,</span>
+	states<span class="token punctuation">:</span> <span class="token punctuation">{</span>
+		counting<span class="token punctuation">:</span> <span class="token punctuation">{</span>
+			onEntry<span class="token punctuation">:</span>  <span class="token string">"enterCounting"</span><span class="token punctuation">,</span>
+			onExit<span class="token punctuation">:</span>  <span class="token string">"exitCounting"</span><span class="token punctuation">,</span>
+			on<span class="token punctuation">:</span> <span class="token punctuation">{</span>
+				INC<span class="token punctuation">:</span> <span class="token punctuation">{</span> actions<span class="token punctuation">:</span>  <span class="token string">"increment"</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+				DEC<span class="token punctuation">:</span> <span class="token punctuation">{</span> target<span class="token punctuation">:</span>  <span class="token string">"counting"</span><span class="token punctuation">,</span> actions<span class="token punctuation">:</span>  <span class="token string">"decrement"</span> <span class="token punctuation">}</span><span class="token punctuation">,</span>
+				DO_NOTHING<span class="token punctuation">:</span> <span class="token punctuation">{</span> internal<span class="token punctuation">:</span>  <span class="token boolean">true</span><span class="token punctuation">,</span> actions<span class="token punctuation">:</span>  <span class="token string">"logNothing"</span> <span class="token punctuation">}</span>
+			<span class="token punctuation">}</span>
+		<span class="token punctuation">}</span>
+	<span class="token punctuation">}</span>
+<span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+<p>My idea was that, for example, one of the actions controls the angular router, consequently making page visible to the user synonymous with the state user is in - no more worrying whether required data for the view is in the store or not. But writing an action for every transition doesn’t seem like a great development experience.</p>
+<ul>
+<li>ngrx store - <a href="https://ngrx.io/">https://ngrx.io/</a></li>
+</ul>
+<p>A bit different approach, fantastic CQRS implementation with great support for angular and reactive programming. This one doesn’t have a state machine as such, however flexibility that reactive effects offer and metareducers as a middleware for events convinced me that it’s a better choice given our needs. Also a few switch statements make for a great state machine ;) We can’t forget that we are working on a living organism, this is not meant to be a full rewrite, it’s a refresh.</p>
+<pre class=" language-javascript"><code class="prism  language-javascript">@<span class="token function">Injectable</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+<span class="token keyword">export</span>  <span class="token keyword">class</span>  <span class="token class-name">MovieEffects</span> <span class="token punctuation">{</span>
+
+@<span class="token function">Effect</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+loadMovies$ <span class="token operator">=</span> <span class="token keyword">this</span><span class="token punctuation">.</span>actions$
+	<span class="token punctuation">.</span><span class="token function">pipe</span><span class="token punctuation">(</span>
+		<span class="token function">ofType</span><span class="token punctuation">(</span><span class="token string">'[Movies Page] Load Movies'</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+		<span class="token function">mergeMap</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span>  <span class="token keyword">this</span><span class="token punctuation">.</span>moviesService<span class="token punctuation">.</span><span class="token function">getAll</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+			<span class="token punctuation">.</span><span class="token function">pipe</span><span class="token punctuation">(</span>
+				<span class="token function">map</span><span class="token punctuation">(</span>movies  <span class="token operator">=&gt;</span> <span class="token punctuation">(</span><span class="token punctuation">{</span> type<span class="token punctuation">:</span>  <span class="token string">'[Movies API] Movies Loaded Success'</span><span class="token punctuation">,</span> payload<span class="token punctuation">:</span>  movies <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+				<span class="token function">catchError</span><span class="token punctuation">(</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span>  <span class="token keyword">of</span><span class="token punctuation">(</span><span class="token punctuation">{</span> type<span class="token punctuation">:</span>  <span class="token string">'[Movies API] Movies Loaded Error'</span> <span class="token punctuation">}</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+			<span class="token punctuation">)</span><span class="token punctuation">)</span>
+		<span class="token punctuation">)</span>
+	<span class="token punctuation">)</span><span class="token punctuation">;</span>
+  
+<span class="token function">constructor</span><span class="token punctuation">(</span>
+		<span class="token keyword">private</span>  actions$<span class="token punctuation">:</span> Actions<span class="token punctuation">,</span>
+		<span class="token keyword">private</span>  moviesService<span class="token punctuation">:</span> MoviesService
+	<span class="token punctuation">)</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+</code></pre>
+<p>With those bases settled, we can start to work on the new front architecure. I’ll try to give you a glimpse into our solution from both frontend and backend perspective in comming posts. It’ll be a fun ride.</p>
+
